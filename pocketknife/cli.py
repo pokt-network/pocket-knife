@@ -3426,6 +3426,7 @@ def fetch_suppliers_for_owner(owner_address: str) -> list[str]:
     
     cmd = [
         "pocketd", "q", "supplier", "list-suppliers",
+        "--owner-address", owner_address,
         "--node", "https://shannon-grove-rpc.mainnet.poktroll.com",
         "--grpc-insecure=false",
         "-o", "json",
@@ -3434,7 +3435,7 @@ def fetch_suppliers_for_owner(owner_address: str) -> list[str]:
     ]
     
     try:
-        console.print("[dim]Querying blockchain for all suppliers...[/dim]")
+        console.print("[dim]Querying blockchain for owner's suppliers...[/dim]")
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         
         if result.returncode != 0:
@@ -3449,20 +3450,17 @@ def fetch_suppliers_for_owner(owner_address: str) -> list[str]:
             console.print("[red]No suppliers found in the response[/red]")
             raise typer.Exit(1)
         
-        console.print(f"[dim]Found {len(suppliers)} total suppliers, filtering for owner...[/dim]")
-        
-        # Filter suppliers by owner address and collect operator addresses
+        # Collect operator addresses (already filtered by owner on server-side)
         operator_addresses = []
         for supplier in suppliers:
-            if supplier.get("owner_address") == owner_address:
-                operator_addr = supplier.get("operator_address")
-                if operator_addr:
-                    operator_addresses.append(operator_addr)
-                    console.print(f"[green]  ✓[/green] {operator_addr}")
-        
+            operator_addr = supplier.get("operator_address")
+            if operator_addr:
+                operator_addresses.append(operator_addr)
+                console.print(f"[green]  ✓[/green] {operator_addr}")
+
         # Sort and deduplicate
         unique_addresses = sorted(set(operator_addresses))
-        
+
         console.print(f"\n[cyan]Found {len(operator_addresses)} supplier(s) ({len(unique_addresses)} unique)[/cyan]")
         
         return unique_addresses
