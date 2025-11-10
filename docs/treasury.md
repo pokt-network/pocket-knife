@@ -100,12 +100,13 @@ Query liquid + staked + commission:
 **Note:** Use validator operator addresses (`poktvaloper1...`), not consensus addresses. Commission represents validator operator earnings from all delegations.
 
 ### Delegator Stakes
-Query liquid + delegator rewards:
+Query liquid + delegated stake + rewards:
 ```json
 {
   "delegator_stakes": ["pokt1delegator..."]
 }
 ```
+**Note:** Uses account addresses (`pokt1...`). Includes the delegated stake amount across all validators plus earned rewards.
 
 ## Output Example
 
@@ -208,7 +209,7 @@ pocketknife treasury --file treasury.json --max-workers 3
 **App Stakes:** Liquid + application stake
 **Node Stakes:** Liquid + supplier stake
 **Validator Stakes:** Liquid + validator stake + commission
-**Delegator Stakes:** Liquid + distribution rewards
+**Delegator Stakes:** Liquid + delegated stake + rewards
 
 ### Duplicate Detection
 - Prevents double-counting across sections

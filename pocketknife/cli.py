@@ -1771,7 +1771,7 @@ def treasury(
     h: bool = typer.Option(False, "-h", help="Show this help message and exit", hidden=True),
 ):
     """
-    Calculate all balances (liquid, app stake, node stake, validator stake + commission) for treasury addresses from JSON file.
+    Calculate all balances (liquid, app stake, node stake, validator stake + commission, delegator stake + rewards) for treasury addresses from JSON file.
     Uses parallel processing for significantly faster execution.
     Expected JSON format: {"liquid": [...], "app_stakes": [...], "node_stakes": [...], "validator_stakes": [...], "delegator_stakes": [...]}
 
@@ -1788,7 +1788,7 @@ def treasury(
     if addresses_file is None:
         console.print("[red]Error: Missing required option '--file'[/red]\n")
         console.print("[bold]Treasury Command Help:[/bold]")
-        console.print("Calculate all balances (liquid, app stake, node stake, validator stake + commission, delegator stakes) for treasury addresses from JSON file.\n")
+        console.print("Calculate all balances (liquid, app stake, node stake, validator stake + commission, delegator stake + rewards) for treasury addresses from JSON file.\n")
         console.print("[bold]Required Options:[/bold]")
         console.print("  [cyan]--file[/cyan]        Path to JSON file with treasury addresses")
         console.print("\n[bold]Optional Options:[/bold]")
@@ -2062,20 +2062,22 @@ def treasury(
         delegator_table = Table(title="Delegator Stake Balance Report")
         delegator_table.add_column("Address", style="cyan", no_wrap=True)
         delegator_table.add_column("Liquid (POKT)", justify="right", style="green")
-        delegator_table.add_column("Delegator Rewards (POKT)", justify="right", style="yellow")
+        delegator_table.add_column("Delegated (POKT)", justify="right", style="blue")
+        delegator_table.add_column("Rewards (POKT)", justify="right", style="yellow")
         delegator_table.add_column("Total (POKT)", justify="right", style="bold white")
         delegator_table.add_column("Status", justify="center")
-        
+
         # Add successful results
         for address, balance_data in delegator_data['results'].items():
             delegator_table.add_row(
                 address,
                 f"{balance_data['liquid']:,.2f}",
+                f"{balance_data['delegated']:,.2f}",
                 f"{balance_data['delegator_rewards']:,.2f}",
                 f"{balance_data['total']:,.2f}",
                 "[green]✓[/green]"
             )
-        
+
         # Add failed results
         for address, error in delegator_data['failed']:
             delegator_table.add_row(
@@ -2083,14 +2085,16 @@ def treasury(
                 "0.00",
                 "0.00",
                 "0.00",
+                "0.00",
                 "[red]✗[/red]"
             )
-        
+
         # Add total
         delegator_table.add_section()
         delegator_table.add_row(
             "[bold]TOTAL[/bold]",
             f"[bold green]{delegator_data['total_liquid']:,.2f}[/bold green]",
+            f"[bold blue]{delegator_data['total_delegated']:,.2f}[/bold blue]",
             f"[bold yellow]{delegator_data['total_delegator_rewards']:,.2f}[/bold yellow]",
             f"[bold white]{total_delegator_stakes:,.2f}[/bold white]",
             f"[dim]{len(delegator_data['results'])}/{len(delegator_stake_addresses)}[/dim]"
@@ -2428,24 +2432,73 @@ def get_delegator_rewards(account_address: str) -> tuple[float, bool, str]:
         return 0.0, False, f"Delegator rewards error: {str(e)}"
 
 
-def get_delegator_stake_balance(address: str) -> tuple[float, float, bool, str]:
+def get_delegated_amount(account_address: str) -> tuple[float, bool, str]:
     """
-    Get delegator stake balance for a single address (liquid + delegator rewards).
-    Returns (liquid_balance, delegator_rewards, success, error_message)
+    Get total delegated stake amount for an account address.
+    Returns (delegated_amount, success, error_message)
+    """
+    cmd = [
+        "pocketd", "query", "staking", "delegations", account_address,
+        "--node", "https://shannon-grove-rpc.mainnet.poktroll.com",
+        "--output", "json"
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        if result.returncode != 0:
+            return 0.0, True, ""  # No delegations is still a successful query
+
+        data = json.loads(result.stdout)
+        delegation_responses = data.get("delegation_responses", [])
+
+        if not delegation_responses:
+            return 0.0, True, ""  # No delegations is still a successful query
+
+        # Sum up all delegated amounts
+        total_upokt = 0.0
+        for delegation in delegation_responses:
+            balance = delegation.get("balance", {})
+            if balance.get("denom") == "upokt":
+                amount_str = balance.get("amount", "0")
+                try:
+                    amount = float(amount_str)
+                    total_upokt += amount
+                except ValueError:
+                    continue
+
+        # Convert from upokt to pokt (divide by 1,000,000)
+        pokt_delegated = total_upokt / 1_000_000
+        return pokt_delegated, True, ""
+
+    except subprocess.TimeoutExpired:
+        return 0.0, False, "Delegated amount query timeout"
+    except json.JSONDecodeError:
+        return 0.0, False, "Invalid delegated amount JSON response"
+    except Exception as e:
+        return 0.0, False, f"Delegated amount error: {str(e)}"
+
+
+def get_delegator_stake_balance(address: str) -> tuple[float, float, float, bool, str]:
+    """
+    Get delegator stake balance for a single address (liquid + delegated + delegator rewards).
+    Returns (liquid_balance, delegated_amount, delegator_rewards, success, error_message)
     """
     # Get liquid balance
     liquid_balance, liquid_success, liquid_error = get_liquid_balance(address)
-    
+
+    # Get delegated amount
+    delegated_amount, delegated_success, delegated_error = get_delegated_amount(address)
+
     # Get delegator rewards
     delegator_rewards, delegator_success, delegator_error = get_delegator_rewards(address)
-    
-    # Return success if either liquid or delegator rewards exist
-    success = liquid_success or delegator_success
+
+    # Return success if any balance exists
+    success = liquid_success or delegated_success or delegator_success
     error_msg = ""
     if not success:
-        error_msg = f"Liquid: {liquid_error or 'Unknown error'}; Delegator: {delegator_error or 'Unknown error'}"
-    
-    return liquid_balance, delegator_rewards, success, error_msg
+        error_msg = f"Liquid: {liquid_error or 'Unknown error'}; Delegated: {delegated_error or 'Unknown error'}; Rewards: {delegator_error or 'Unknown error'}"
+
+    return liquid_balance, delegated_amount, delegator_rewards, success, error_msg
 
 
 def get_validator_commission(validator_operator_address: str) -> tuple[float, bool, str]:
@@ -2697,31 +2750,33 @@ def query_delegator_stakes_parallel(addresses: list[str], max_workers: int = 10)
     
     def query_single_delegator(address: str):
         nonlocal completed_count
-        liquid_balance, delegator_rewards, success, error = get_delegator_stake_balance(address)
-        
+        liquid_balance, delegated_amount, delegator_rewards, success, error = get_delegator_stake_balance(address)
+
         with lock:
             completed_count += 1
             console.print(f"[dim]Delegator stake {completed_count}/{total_count}: {address}... done[/dim]")
-            
+
             if success:
                 results[address] = {
                     'liquid': liquid_balance,
+                    'delegated': delegated_amount,
                     'delegator_rewards': delegator_rewards,
-                    'total': liquid_balance + delegator_rewards
+                    'total': liquid_balance + delegated_amount + delegator_rewards
                 }
             else:
                 failed.append((address, error))
-    
+
     # Execute queries in parallel
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [executor.submit(query_single_delegator, addr) for addr in addresses]
         for future in as_completed(futures):
             future.result()  # Wait for completion and handle exceptions
-    
+
     return {
         'results': results,
         'failed': failed,
         'total_liquid': sum(r['liquid'] for r in results.values()),
+        'total_delegated': sum(r['delegated'] for r in results.values()),
         'total_delegator_rewards': sum(r['delegator_rewards'] for r in results.values()),
         'total_combined': sum(r['total'] for r in results.values())
     }
@@ -3200,7 +3255,7 @@ def delegator_stakes(
     h: bool = typer.Option(False, "-h", help="Show this help message and exit", hidden=True),
 ):
     """
-    Calculate delegator stake balances (liquid + delegator rewards) for addresses.
+    Calculate delegator stake balances (liquid + delegated + rewards) for addresses.
 
     Supports two file formats:
     1. Text file: One address per line
@@ -3216,7 +3271,7 @@ def delegator_stakes(
     if addresses_file is None:
         console.print("[red]Error: Missing required option '--file'[/red]\n")
         console.print("[bold]Delegator Stakes Command Help:[/bold]")
-        console.print("Calculate delegator stake balances (liquid + delegator rewards) for addresses.\n")
+        console.print("Calculate delegator stake balances (liquid + delegated + rewards) for addresses.\n")
         console.print("[bold]Supported File Formats:[/bold]")
         console.print("  • Text file: One address per line")
         console.print("  • JSON file: Extracts from 'delegator_stakes' array")
@@ -3244,28 +3299,32 @@ def delegator_stakes(
     table = Table(title="Delegator Stake Balance Report")
     table.add_column("Address", style="cyan", no_wrap=True)
     table.add_column("Liquid (POKT)", justify="right", style="green")
-    table.add_column("Delegator Rewards (POKT)", justify="right", style="yellow")
+    table.add_column("Delegated (POKT)", justify="right", style="blue")
+    table.add_column("Rewards (POKT)", justify="right", style="yellow")
     table.add_column("Total (POKT)", justify="right", style="bold white")
     table.add_column("Status", justify="center")
-    
+
     successful_queries = []
     failed_addresses = []
     total_liquid = 0.0
+    total_delegated = 0.0
     total_delegator_rewards = 0.0
-    
+
     for i, address in enumerate(addresses, 1):
         console.print(f"[dim]Querying {i}/{len(addresses)}: {address}[/dim]")
-        
-        liquid_balance, delegator_rewards, success, error = get_delegator_stake_balance(address)
-        total_balance = liquid_balance + delegator_rewards
-        
+
+        liquid_balance, delegated_amount, delegator_rewards, success, error = get_delegator_stake_balance(address)
+        total_balance = liquid_balance + delegated_amount + delegator_rewards
+
         if success:
-            successful_queries.append((address, liquid_balance, delegator_rewards, total_balance))
+            successful_queries.append((address, liquid_balance, delegated_amount, delegator_rewards, total_balance))
             total_liquid += liquid_balance
+            total_delegated += delegated_amount
             total_delegator_rewards += delegator_rewards
             table.add_row(
                 address,
                 f"{liquid_balance:,.2f}",
+                f"{delegated_amount:,.2f}",
                 f"{delegator_rewards:,.2f}",
                 f"{total_balance:,.2f}",
                 "[green]✓[/green]"
@@ -3277,15 +3336,17 @@ def delegator_stakes(
                 "0.00",
                 "0.00",
                 "0.00",
+                "0.00",
                 "[red]✗[/red]"
             )
-    
+
     # Add separator row and totals
     table.add_section()
-    grand_total = total_liquid + total_delegator_rewards
+    grand_total = total_liquid + total_delegated + total_delegator_rewards
     table.add_row(
         "[bold]TOTAL[/bold]",
         f"[bold green]{total_liquid:,.2f}[/bold green]",
+        f"[bold blue]{total_delegated:,.2f}[/bold blue]",
         f"[bold yellow]{total_delegator_rewards:,.2f}[/bold yellow]",
         f"[bold white]{grand_total:,.2f}[/bold white]",
         f"[dim]{len(successful_queries)}/{len(addresses)}[/dim]"
