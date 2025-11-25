@@ -33,6 +33,7 @@ pocketknife --help
 | **import-keys** | Import keys from mnemonic or hex | [📖 Docs](docs/import-keys.md) |
 | **stake-apps** | Stake applications (single or batch) | [📖 Docs](docs/stake-apps.md) |
 | **treasury** | Comprehensive balance analysis | [📖 Docs](docs/treasury.md) |
+| **treasury-tools** | Individual balance queries (liquid, stakes, etc.) | [📖 Docs](docs/treasury.md#individual-balance-tools) |
 | **unstake** | Batch unstake operator addresses | [📖 Docs](docs/unstake.md) |
 
 ## Installation
