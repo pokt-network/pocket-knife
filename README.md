@@ -49,17 +49,19 @@ make install
 ### Manual Installation
 
 ```bash
-# Prerequisites: Python 3.8+, pocketd CLI
+# Prerequisites: Python 3.8+, pipx, pocketd CLI
 
-# Clone repository
+# Install pipx if you don't have it
+brew install pipx  # macOS
+# or: pip install pipx
+
+# Clone and install
 git clone https://github.com/buildwithgrove/pocket-knife.git
 cd pocket-knife
-
-# Install with pipx (recommended)
 pipx install .
 
 # Or install in development mode
-pip install -e .
+pipx install -e .
 ```
 
 ## Keyring Backends

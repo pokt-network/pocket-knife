@@ -91,13 +91,13 @@ Query liquid + staked balances for nodes/suppliers:
 ```
 
 ### Validator Stakes
-Query liquid + staked + commission:
+Query liquid + self-stake + commission:
 ```json
 {
   "validator_stakes": ["poktvaloper1..."]
 }
 ```
-**Note:** Use validator operator addresses (`poktvaloper1...`), not consensus addresses. Commission represents validator operator earnings from all delegations.
+**Note:** Use validator operator addresses (`poktvaloper1...`), not consensus addresses. Shows the validator's **self-delegation** (their own stake), not total tokens bonded. This prevents double-counting when delegators are tracked separately. Commission represents validator operator earnings.
 
 ### Delegator Stakes
 Query liquid + delegated stake + rewards:
@@ -208,7 +208,7 @@ pocketknife treasury --file treasury.json --max-workers 3
 **Liquid:** Direct balance query
 **App Stakes:** Liquid + application stake
 **Node Stakes:** Liquid + supplier stake
-**Validator Stakes:** Liquid + validator stake + commission
+**Validator Stakes:** Liquid + self-stake + commission
 **Delegator Stakes:** Liquid + delegated stake + rewards
 
 ### Duplicate Detection
