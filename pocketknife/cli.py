@@ -138,7 +138,7 @@ def add_services(
     # Validate network and set node URL and chain ID
     network_config = {
         "main": {
-            "node_url": "https://pocket.api.pocket.network",
+            "node_url": "https://sauron-rpc.infra.pocket.network",
             "chain_id": "pocket"
         },
         "beta": {
@@ -2210,7 +2210,7 @@ def get_node_stake_balance(address: str) -> tuple[float, float, bool, str]:
     # Get staked balance
     cmd = [
         "pocketd", "query", "supplier", "show-supplier", address,
-        "--node", "https://pocket.api.pocket.network",
+        "--node", "https://sauron-rpc.infra.pocket.network",
         "--output", "json"
     ]
     
@@ -2269,7 +2269,7 @@ def get_app_stake_balance(address: str) -> tuple[float, float, bool, str]:
     # Get staked balance
     cmd = [
         "pocketd", "query", "application", "show-application", address,
-        "--node", "https://pocket.api.pocket.network",
+        "--node", "https://sauron-rpc.infra.pocket.network",
         "--output", "json"
     ]
     
@@ -2324,7 +2324,7 @@ def get_liquid_balance(address: str) -> tuple[float, bool, str]:
     """
     cmd = [
         "pocketd", "query", "bank", "balances", address,
-        "--node", "https://pocket.api.pocket.network",
+        "--node", "https://sauron-rpc.infra.pocket.network",
         "--output", "json"
     ]
     
@@ -2391,7 +2391,7 @@ def get_delegator_rewards(account_address: str) -> tuple[float, bool, str]:
     """
     cmd = [
         "pocketd", "query", "distribution", "rewards", account_address,
-        "--node", "https://pocket.api.pocket.network",
+        "--node", "https://sauron-rpc.infra.pocket.network",
         "--output", "json"
     ]
     
@@ -2439,7 +2439,7 @@ def get_delegated_amount(account_address: str) -> tuple[float, bool, str]:
     """
     cmd = [
         "pocketd", "query", "staking", "delegations", account_address,
-        "--node", "https://pocket.api.pocket.network",
+        "--node", "https://sauron-rpc.infra.pocket.network",
         "--output", "json"
     ]
 
@@ -2508,7 +2508,7 @@ def get_validator_commission(validator_operator_address: str) -> tuple[float, bo
     """
     cmd = [
         "pocketd", "query", "distribution", "commission", validator_operator_address,
-        "--node", "https://pocket.api.pocket.network",
+        "--node", "https://sauron-rpc.infra.pocket.network",
         "--output", "json"
     ]
     
@@ -2577,7 +2577,7 @@ def get_validator_stake_balance(address: str) -> tuple[float, float, float, bool
     # Query the delegation from the validator's account address to their operator address
     cmd = [
         "pocketd", "query", "staking", "delegation", account_address, address,
-        "--node", "https://pocket.api.pocket.network",
+        "--node", "https://sauron-rpc.infra.pocket.network",
         "--output", "json"
     ]
 
@@ -3497,7 +3497,7 @@ def fetch_suppliers_for_owner(owner_address: str) -> list[str]:
     cmd = [
         "pocketd", "q", "supplier", "list-suppliers",
         "--owner-address", owner_address,
-        "--node", "https://pocket.api.pocket.network",
+        "--node", "https://sauron-rpc.infra.pocket.network",
         "--grpc-insecure=false",
         "-o", "json",
         "--page-limit=100000",
